@@ -1,49 +1,79 @@
----
-#
-# This is the canonical configuration for the `README.md`
-# Run `make readme` to rebuild the `README.md`
-#
+name: Terraform Azure Relay
 
-# Name of this project
-name : Terraform Azure Module Template
+intro: |-
+  With our comprehensive DevOps toolkit - streamline operations, automate workflows, enhance collaboration and deploy with confidence.
 
-# License of this project
+badges_text: "Latest Release | tfsec | License | Changelog"
+
+about: |-
+  Terraform module to create and manage Azure Relay namespaces, hybrid connections, shared access policies, Entra ID role assignments, private endpoints and diagnostic settings on Azure.
+
 license: "APACHE"
 
-# Canonical GitHub repo
-github_repo: terraform-az-modules/terraform-module-template
+github_repo: terraform-az-modules/terraform-azurerm-azure-relay
 
-# Badges to display
 badges:
   - name: "Terraform"
-    image: "https://img.shields.io/badge/Terraform-v0.13-green"
+    image: "https://img.shields.io/badge/Terraform-v1.10.0-green"
     url: "https://www.terraform.io"
+
   - name: "Licence"
     image: "https://img.shields.io/badge/License-APACHE-blue.svg"
     url: "LICENSE.md"
-  - name: "Changelog"
-    image: "https://img.shields.io/badge/Changelog-blue"
-    url: "CHANGELOG.md"
 
-# Prerequesties to display
-prerequesties:
+prerequisites:
   - name: Terraform
     url: https://learn.hashicorp.com/terraform/getting-started/install.html
-    version: ">= 1.6.6"
+    version: ">= 1.10.0"
 
 providers:
-  - name: azure
-    url: https://azure.microsoft.com/
-    version: ">= 3.116.0"
+  - name: azurerm
+    url: https://registry.terraform.io/providers/hashicorp/azurerm/latest
+    version: ">= 4.0"
 
-#  description of this project
 description: |-
-  Terraform Azure Module Template to create new modules using this as baseline
+  Terraform module to create and manage Azure Relay on Azure. It creates a Relay namespace, hybrid connections (with client authorization required by default), namespace- and entity-level shared access policies, Entra ID role assignments scoped to the namespace or a single hybrid connection, an optional private endpoint, and optional diagnostic settings.
 
-# How to use this project
-# How to use this project
+  ### Known limitations & operational notes
+
+  - **SKU**: Azure Relay only offers the `Standard` SKU.
+  - **Network access**: the `azurerm` provider does not expose public network access, IP rules or local (SAS) auth settings for Relay namespaces. Use the private endpoint to keep traffic on your network, and prefer `role_assignments` (Entra ID) over shared access keys.
+  - **Root key**: Azure creates `RootManageSharedAccessKey` on every namespace. Do not hand it to applications; create narrower `authorization_rules` instead.
+  - **WCF relays** are not supported by the `azurerm` provider; this module manages hybrid connections only.
+  - **State sensitivity**: authorization rule keys and connection strings are stored in Terraform state. Use an encrypted backend and restrict state access.
+
 usage: |-
-  Here are some examples of how you can use this module in your inventory structure:
+  ### Example
+
   ```hcl
-    locals {}
-    ```
+  module "azure_relay" {
+    source              = "../../"
+    name                = "app"
+    environment         = "dev"
+    location            = "centralindia"
+    resource_group_name = "rg-app-dev-inci"
+
+    hybrid_connections = {
+      reporting-db = {
+        user_metadata = "On-premises reporting database listener"
+
+        authorization_rules = {
+          listener = { listen = true }
+          sender   = { send = true }
+        }
+      }
+    }
+
+    role_assignments = {
+      app-sender = {
+        principal_id          = "00000000-0000-0000-0000-000000000000"
+        role_definition_name  = "Azure Relay Sender"
+        hybrid_connection_key = "reporting-db"
+      }
+    }
+
+    enable_private_endpoint = true
+    subnet_id               = "<subnet id>"
+    private_dns_zone_ids    = "<privatelink.servicebus.windows.net zone id>"
+  }
+  ```
